@@ -1,0 +1,81 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Marks Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{% url 'student_report' %}">⬅️ Back to Students</a>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link btn btn-outline-light" href="{% url 'logout' %}">Logout</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+    <h2 class="mb-4">Marks Report for <span class="text-success">{{ student.student_name }}</span></h2>
+
+    <div class="row mb-5">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-info p-3 h-100">
+                <h5 class="card-title text-info">Total Marks</h5>
+                <p class="fs-2 fw-bold text-center">{{ total_marks }}</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-warning p-3 h-100">
+                <h5 class="card-title text-warning">Overall Rank</h5>
+                <p class="fs-2 fw-bold text-center">#{{ rank }}</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-success p-3 h-100">
+                <h5 class="card-title text-success">Department</h5>
+                <p class="fs-2 fw-bold text-center">{{ student.department.department }}</p>
+            </div>
+        </div>
+    </div>
+
+    <h3 class="mb-3">Subject Wise Marks (Passing Mark: 35)</h3>
+    <table class="table table-bordered table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Subject</th>
+                <th class="text-center">Marks (Out of 100)</th>
+                <th class="text-center">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for marks in queryset %}
+            <tr class="{% if marks.marks < 35 %}table-danger{% else %}table-success{% endif %}">
+                <td>{{ marks.subject.subject_name }}</td>
+                <td class="text-center">{{ marks.marks }}</td>
+                <td class="text-center">
+                    {% if marks.marks < 35 %}
+                        <span class="badge bg-danger p-2">FAIL</span>
+                    {% else %}
+                        <span class="badge bg-success p-2">PASS</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3" class="text-center">No marks found</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

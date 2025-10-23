@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.urls import path
 from students.views import (
-    login_page, register, logout_page, student_report, see_marks
+    login_page, register, logout_page, student_report, see_marks, home_page,
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -18,6 +18,7 @@ urlpatterns = [
     path('register/', register, name="register"),
 
     # Student Management URLs
+    path('', home_page, name="home"),
     path('', student_report, name="student_report"), # Root URL redirects to students
     path('students/', student_report, name="student_report"),
     path('see_marks/<str:student_id>/', see_marks, name="see_marks"),

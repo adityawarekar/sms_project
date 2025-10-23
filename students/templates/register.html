@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block start %}
+<div class="container mt-5">
+  <form class="col-6 mx-auto card p-4 shadow-lg" method="post">
+    {% csrf_token %}
+    <h2 class="text-center mb-4">Register New Account</h2>
+    <hr>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label for="first_name" class="form-label">First Name</label>
+            <input type="text" name="first_name" class="form-control" id="first_name" required>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label for="last_name" class="form-label">Last Name</label>
+            <input type="text" name="last_name" class="form-control" id="last_name" required>
+        </div>  
+    </div>
+
+    <div class="mb-3">
+      <label for="username" class="form-label">Username</label>
+      <input type="text" name="username" class="form-control" id="username" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="password" class="form-label">Password</label>
+      <input type="password" name="password" class="form-control" id="password" required>
+    </div>
+
+    <p>Already have an account? <a href="/login/">Login</a></p>
+
+    <button type="submit" class="btn btn-primary">Register</button>
+  </form>
+</div>
+{% endblock %}
