@@ -263,10 +263,10 @@ import random
 fake = Faker()
 
 def seed_subjects():
-    subjects = ["Maths", "Physics", "Chemistry", "Biology", "English", "CS Theory"]
+    subjects = ["Data Sturctures and Algorithm", "Database Management System", "Object Oriented Programming", "Operating Systems", "Computer Networks", "Software Engineering"]
     for sub in subjects:
         Subject.objects.get_or_create(subject_name=sub)
-    print("✅ Subjects created successfully.")
+    print("✅ Technical Subjects created successfully.")    
 
 def seed_db(n=10) -> None:
     departments_objs = Department.objects.all()
