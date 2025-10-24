@@ -46,10 +46,10 @@
             {% for student in page_obj %}
             <tr>
                 <td>
-                  <a href="{% url 'see_marks' student.student_id.student_id %}" class="text-primary fw-bold">
-                     {{ student.student_id.student_id }}
-                  </a>
-                 </td>
+  <a href="{% url 'student_profile' student.student_id.student_id %}" class="text-primary fw-bold">
+     {{ student.student_id.student_id }}
+  </a>
+</td>
                 <td>{{ student.student_name }}</td>
                 <td><span class="badge bg-secondary">{{ student.department.department }}</span></td>
                 <td>{{ student.student_email }}</td>

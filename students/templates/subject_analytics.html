@@ -1,0 +1,69 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Subject Analytics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{% url 'student_report' %}">⬅️ Student List</a>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link btn btn-outline-light" href="{% url 'logout' %}">Logout</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+    <h2 class="mb-5 text-center">📊 Subject Performance Analytics</h2>
+
+    <div class="alert alert-info" role="alert">
+        Statistics calculated across all currently enrolled students for each subject.
+    </div>
+
+    <div class="row">
+        {% for data in analytics %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card border-primary shadow-sm h-100">
+                <div class="card-header bg-primary text-white fw-bold">
+                    {{ data.subject_name }}
+                </div>
+                <div class="card-body">
+                    <p class="card-text mb-1"><strong>Avg Marks:</strong> 
+                        <span class="badge bg-info fs-6">{{ data.avg_marks }}</span>
+                    </p>
+                    <p class="card-text mb-1"><strong>Highest Mark:</strong> 
+                        <span class="badge bg-success fs-6">{{ data.max_marks }}</span>
+                    </p>
+                    <p class="card-text mb-1"><strong>Lowest Mark:</strong> 
+                        <span class="badge bg-warning fs-6">{{ data.min_marks }}</span>
+                    </p>
+                    <hr>
+                    <p class="card-text mb-1"><strong>Total Students:</strong> {{ data.total_students }}</p>
+                    <p class="card-text mb-1"><strong>Fail Count (<35):</strong> 
+                        <span class="badge bg-danger fs-6">{{ data.fail_count }}</span>
+                    </p>
+                    <p class="card-text mb-1"><strong>Pass Rate:</strong> 
+                        <span class="badge bg-success fs-6">{{ data.pass_rate }}%</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-warning">No subjects or marks data found to generate analytics.</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

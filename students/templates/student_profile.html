@@ -1,0 +1,123 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ student.student_name }} Profile</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{% url 'student_report' %}">⬅️ Student List</a>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link btn btn-outline-light" href="{% url 'logout' %}">Logout</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+    <h2 class="mb-4">Student Profile: <span class="text-success">{{ student.student_name }}</span></h2>
+    
+    <div class="row mb-5">
+        <div class="col-md-4">
+            <div class="card border-info shadow-sm p-3 h-100">
+                <h5 class="card-title text-info">Personal Details</h5>
+                <p class="mb-1"><strong>ID:</strong> {{ student.student_id.student_id }}</p>
+                <p class="mb-1"><strong>Department:</strong> {{ student.department.department }}</p>
+                <p class="mb-1"><strong>Email:</strong> {{ student.student_email }}</p>
+                <p class="mb-1"><strong>Age:</strong> {{ student.student_age }}</p>
+                <p class="mb-1"><strong>Address:</strong> {{ student.student_address|truncatechars:30 }}</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-warning shadow-sm p-3 h-100">
+                <h5 class="card-title text-warning">Academic Summary</h5>
+                <p class="mb-1"><strong>Total Marks:</strong> <span class="badge bg-primary fs-5">{{ total_marks }}</span></p>
+                <p class="mb-1"><strong>Total Subjects:</strong> {{ marks_queryset|length }}</p>
+                <p class="mb-1 text-muted">See rank in <a href="{% url 'student_leaderboard' %}">Leaderboard</a>.</p>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card border-success shadow-sm p-3 h-100">
+                <h5 class="card-title text-success">Attendance Summary</h5>
+                {% if attendance_percentage is not None %}
+                    <p class="mb-1"><strong>Attendance Rate:</strong> 
+                        <span class="badge bg-success fs-5">{{ attendance_percentage }}%</span>
+                    </p>
+                    <p class="mb-1"><strong>Total Records:</strong> {{ attendance_data|length }} days</p>
+                {% else %}
+                     <p class="mb-1 text-muted">Attendance records not found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <h3 class="mb-3">Subject Wise Marks (Passing Mark: 35)</h3>
+    <table class="table table-bordered table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Subject</th>
+                <th class="text-center">Marks (Out of 100)</th>
+                <th class="text-center">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for marks in marks_queryset %}
+            <tr class="{% if marks.marks < 35 %}table-danger{% else %}table-success{% endif %}">
+                <td>{{ marks.subject.subject_name }}</td>
+                <td class="text-center">{{ marks.marks }}</td>
+                <td class="text-center">
+                    {% if marks.marks < 35 %}
+                        <span class="badge bg-danger p-2">FAIL</span>
+                    {% else %}
+                        <span class="badge bg-success p-2">PASS</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3" class="text-center">No marks found for this student.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 class="mt-5 mb-3">Attendance History</h3>
+    <table class="table table-bordered table-sm table-hover">
+        <thead class="table-secondary">
+            <tr>
+                <th>Date</th>
+                <th class="text-center">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in attendance_data %}
+            <tr class="{% if record.is_present %}table-light{% else %}table-danger{% endif %}">
+                <td>{{ record.date|date:"F d, Y" }}</td>
+                <td class="text-center">
+                    {% if record.is_present %}
+                        <span class="badge bg-success">Present</span>
+                    {% else %}
+                        <span class="badge bg-danger">Absent</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2" class="text-center">No detailed attendance records found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

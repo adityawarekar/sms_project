@@ -51,3 +51,18 @@ class SubjectMarks(models.Model):
 
     class Meta:
         unique_together = ['student', 'subject']
+
+# students/models.py (Add new model)
+
+class Attendance(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendances')
+    date = models.DateField()
+    is_present = models.BooleanField(default=False)
+
+    def __str__(self):
+        status = "Present" if self.is_present else "Absent"
+        return f'{self.student.student_name} - {self.date} ({status})'
+
+    class Meta:
+        unique_together = ['student', 'date']
+        ordering = ['-date']

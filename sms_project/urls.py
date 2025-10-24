@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.urls import path
 from students.views import (
-    login_page, register, logout_page, student_report, see_marks, home_page,
+    login_page, register, logout_page, student_report, student_profile, home_page, student_leaderboard, subject_analytics
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -21,7 +21,9 @@ urlpatterns = [
     path('', home_page, name="home"),
     path('', student_report, name="student_report"), # Root URL redirects to students
     path('students/', student_report, name="student_report"),
-    path('see_marks/<str:student_id>/', see_marks, name="see_marks"),
+    path('leaderboard/', student_leaderboard, name="student_leaderboard"),
+    path('analytics/subjects/', subject_analytics, name="subject_analytics"), # 👈 NEW PATH
+    path('student/profile/<str:student_id>/', student_profile, name="student_profile"),
 ]
 
 if settings.DEBUG:

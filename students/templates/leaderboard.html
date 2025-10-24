@@ -1,0 +1,89 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Leaderboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .rank-badge {
+            font-size: 1.1em;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            border-radius: 50%;
+            display: inline-block;
+            text-align: center;
+        }
+        .rank-1 { background-color: gold; color: #333; }
+        .rank-2 { background-color: silver; color: #333; }
+        .rank-3 { background-color: #cd7f32; color: white; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{% url 'student_report' %}">⬅️ Student List</a>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link btn btn-outline-light" href="{% url 'logout' %}">Logout</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+    <h2 class="mb-5 text-center">🏆 Overall Academic Leaderboard</h2>
+
+    <table class="table table-bordered table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th class="text-center">Rank</th>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th class="text-center">Total Marks</th>
+                <th class="text-center">Percentage (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in leaderboard %}
+            <tr>
+                <td class="text-center">
+                    {% if student.rank == 1 %}
+                        <span class="rank-badge rank-1 fw-bold">{{ student.rank }}</span>
+                    {% elif student.rank == 2 %}
+                        <span class="rank-badge rank-2 fw-bold">{{ student.rank }}</span>
+                    {% elif student.rank == 3 %}
+                        <span class="rank-badge rank-3 fw-bold">{{ student.rank }}</span>
+                    {% else %}
+                        {{ student.rank }}
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'student_profile' student.student_id %}">
+                        {{ student.student_id }}
+                    </a>
+                </td>
+                <td>{{ student.student_name }}</td>
+                <td>{{ student.department }}</td>
+                <td class="text-center fw-bold text-info">{{ student.total_marks }}</td>
+                <td class="text-center fw-bold">
+                    <span class="badge bg-success fs-6">{{ student.percentage }}%</span>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center">No students found for the leaderboard.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

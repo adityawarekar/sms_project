@@ -7,7 +7,9 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum
-from .models import Department, Student, SubjectMarks, StudentID, Subject
+from django.db.models import Avg, Max, Min, Count # Import new aggregators
+from .models import Department, Student, SubjectMarks, StudentID, Subject , Attendance , models
+
 
 # --- Authentication Views ---
 
@@ -113,6 +115,33 @@ def see_marks(request, student_id):
         "student": student,
     })
 
+# students/views.py (Add this new view)
+
+@login_required
+def student_profile(request, student_id):
+    """
+    Shows a comprehensive profile page for a single student.
+    """
+    # Use the Student ID string to fetch the Student object
+    student = get_object_or_404(Student, student_id__student_id=student_id)
+    
+    # Existing marks data
+    marks_queryset = SubjectMarks.objects.filter(student=student).select_related('subject')
+
+    # Calculate Total Marks (for display)
+    total_marks = marks_queryset.aggregate(total=Sum('marks'))['total'] or 0
+
+    # TODO: Fetch Attendance data here once the model is created
+
+    context = {
+        'student': student,
+        'marks_queryset': marks_queryset,
+        'total_marks': total_marks,
+        # 'attendance_data': attendance_data, # Add later
+    }
+    return render(request, 'student_profile.html', context)
+
+
 def home_page(request):
     """
     Renders the public landing page. 
@@ -124,6 +153,108 @@ def home_page(request):
     
     # If anonymous, show the public landing page (which has Login/Register links)
     return render(request, 'home.html')
+
+# students/views.py (Update student_profile view)
+
+@login_required
+def student_profile(request, student_id):
+    student = get_object_or_404(Student, student_id__student_id=student_id)
+    marks_queryset = SubjectMarks.objects.filter(student=student).select_related('subject')
+    total_marks = marks_queryset.aggregate(total=Sum('marks'))['total'] or 0
+
+    # NEW: Fetch Attendance Data
+    attendance_data = Attendance.objects.filter(student=student).order_by('-date')
+    
+    # Calculate Attendance Percentage
+    total_days = attendance_data.count()
+    present_days = attendance_data.filter(is_present=True).count()
+    attendance_percentage = (present_days / total_days * 100) if total_days > 0 else 0
+
+    context = {
+        'student': student,
+        'marks_queryset': marks_queryset,
+        'total_marks': total_marks,
+        'attendance_data': attendance_data, # 👈 ADDED
+        'attendance_percentage': round(attendance_percentage, 2), # 👈 ADDED
+    }
+    return render(request, 'student_profile.html', context)
+
+
+# students/views.py (Add new leaderboard view)
+
+@login_required
+def student_leaderboard(request):
+    """
+    Calculates overall performance and ranks all students.
+    """
+    # 1. Calculate totals for all students
+    all_students_totals = (
+        SubjectMarks.objects.values(
+            'student__student_id__student_id',
+            'student__student_name',
+            'student__department__department'
+        )
+        .annotate(
+            total_marks=Sum('marks'),
+            subject_count=models.Count('subject') # Need Count to calculate percentage
+        )
+        .order_by('-total_marks')
+    )
+
+    # 2. Calculate percentage and assign rank
+    leaderboard = []
+    max_total_marks = Subject.objects.count() * 100 # Assuming max 100 marks per subject
+    
+    for idx, data in enumerate(all_students_totals, 1):
+        total = data['total_marks']
+        count = data['subject_count']
+        
+        # Calculate overall percentage
+        percentage = (total / max_total_marks * 100) if max_total_marks > 0 else 0
+        
+        leaderboard.append({
+            'rank': idx,
+            'student_id': data['student__student_id__student_id'],
+            'student_name': data['student__student_name'],
+            'department': data['student__department__department'],
+            'total_marks': total,
+            'percentage': round(percentage, 2),
+        })
+
+    return render(request, 'leaderboard.html', {'leaderboard': leaderboard})
+
+@login_required
+def subject_analytics(request):
+    """
+    Provides statistics (avg, highest, lowest, fail rate) per subject.
+    """
+    all_subjects = Subject.objects.all()
+    
+    analytics = []
+    
+    for subject in all_subjects:
+        # Aggregate performance data for the current subject
+        stats = SubjectMarks.objects.filter(subject=subject).aggregate(
+            avg_marks=Avg('marks'),
+            max_marks=Max('marks'),
+            min_marks=Min('marks'),
+            total_count=Count('marks')
+        )
+        
+        # Calculate Fail Count (marks < 35)
+        fail_count = SubjectMarks.objects.filter(subject=subject, marks__lt=35).count()
+        
+        analytics.append({
+            'subject_name': subject.subject_name,
+            'avg_marks': round(stats['avg_marks'], 2) if stats['avg_marks'] else 0,
+            'max_marks': stats['max_marks'] or 0,
+            'min_marks': stats['min_marks'] or 0,
+            'total_students': stats['total_count'] or 0,
+            'fail_count': fail_count,
+            'pass_rate': round(((stats['total_count'] - fail_count) / stats['total_count'] * 100), 2) if stats['total_count'] > 0 else 0
+        })
+
+    return render(request, 'subject_analytics.html', {'analytics': analytics})
 
 # --- Seeding Utilities (Keep separate for clean views) ---
 from faker import Faker
