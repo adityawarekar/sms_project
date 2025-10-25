@@ -144,16 +144,18 @@ def student_profile(request, student_id):
 
 def home_page(request):
     """
-    Renders the public landing page. 
-    Redirects authenticated users to the student report.
+    Renders the public landing page.
+    FORCES LOGOUT of authenticated users to ensure the dashboard is seen first.
     """
     if request.user.is_authenticated:
-        # If logged in, send them straight to the main report
-        return redirect('student_report')
-    
-    # If anonymous, show the public landing page (which has Login/Register links)
+        # Step 1: Explicitly log out the user
+        logout(request) 
+        
+        # Step 2: Set a message so the user knows what happened (optional)
+        messages.info(request, "Your previous session was automatically ended. Please log in.") 
+        
+    # Always render the public landing page (home.html)
     return render(request, 'home.html')
-
 # students/views.py (Update student_profile view)
 
 @login_required

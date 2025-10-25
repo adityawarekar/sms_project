@@ -18,8 +18,8 @@ urlpatterns = [
     path('register/', register, name="register"),
 
     # Student Management URLs
-    path('', home_page, name="home"),
-    path('', student_report, name="student_report"), # Root URL redirects to students
+   path('', home_page, name="home"), # Root URL hits the home_page function
+    path('students/', student_report, name="student_report"),
     path('students/', student_report, name="student_report"),
     path('leaderboard/', student_leaderboard, name="student_leaderboard"),
     path('analytics/subjects/', subject_analytics, name="subject_analytics"), # 👈 NEW PATH
