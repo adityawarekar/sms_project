@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.http import HttpResponse
 import csv
-from .models import Department, StudentID, Student, Subject, SubjectMarks, Attendance
+from .models import Department, StudentID, Student, Subject, SubjectMarks, Attendance, Profile
 
 
 
@@ -29,6 +29,12 @@ class SubjectMarksAdmin(admin.ModelAdmin):
     list_display = ("student", "subject", "marks")
     list_filter = ("subject", "student")
     search_fields = ("student__student_name", "subject__subject_name")
+    
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'role', 'student', 'related_student')
+    list_filter = ('role',)
+    search_fields = ('user__username', 'student__student_name', 'related_student__student_name')
 
 
 @admin.register(Student)

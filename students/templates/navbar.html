@@ -1,0 +1,20 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{% url 'home' %}">🎓 College SMS Dashboard</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        {% if user.is_authenticated and user.profile.role == 'staff' %}
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'student_report' %}">Student List</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'subject_analytics' %}">Analytics</a>
+        </li>
+        {% endif %}
+        <li class="nav-item">
+          <a class="nav-link btn btn-outline-light" href="{% url 'logout' %}">Logout ({{ user.username }})</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>

@@ -1,4 +1,4 @@
-# students/views.py
+# students/views.py (COMPLETELY UPDATED FOR RBAC, FEES, and DASHBOARDS)
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.models import User
@@ -6,16 +6,25 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Sum
-from django.db.models import Avg, Max, Min, Count # Import new aggregators
-from .models import Department, Student, SubjectMarks, StudentID, Subject , Attendance , models
+from django.db.models import Sum, Avg, Max, Min, Count, Q
+from django.http import JsonResponse
+
+# 🚨 CORRECTED IMPORTS: Ensure all necessary models are imported
+from .models import Department, Student, SubjectMarks, StudentID, Subject, Attendance, Profile, FeeRecord
+
+import datetime # Required for FeeRecord default
+import random # For seeding
+from faker import Faker
+fake = Faker()
 
 
-# --- Authentication Views ---
+# -------------------------------------------------------------------
+# --- AUTHENTICATION & HOME VIEWS ---
+# -------------------------------------------------------------------
 
 def register(request):
+    # ... (Existing register logic) ...
     if request.method == "POST":
-        # ... (Existing register logic) ...
         first_name = request.POST.get('first_name')
         last_name = request.POST.get('last_name')
         username = request.POST.get('username')
@@ -33,48 +42,198 @@ def register(request):
         user.set_password(password)
         user.save()
 
-        messages.success(request, "Account created successfully! Please login.")
+        # NOTE: A profile MUST be created in admin for the new user to function.
+        messages.success(request, "Account created successfully! Please contact admin to assign a role and profile before login.")
         return redirect('/login/')
 
     return render(request, 'register.html')
 
 
 def login_page(request):
+    # 🚨 FIX: Consolidating the duplicate login_page functions.
     if request.method == "POST":
-        # ... (Existing login logic) ...
         username = request.POST.get('username')
         password = request.POST.get('password')
-
+        
         user = authenticate(username=username, password=password)
 
-        if user is None:
+        if user:
+            login(request, user)
+            
+            # --- NEW: ROLE-BASED REDIRECTION ---
+            profile = Profile.objects.filter(user=user).first()
+            
+            if not profile:
+                # If no profile, they can't access any dashboard
+                messages.error(request, 'No profile assigned. Please contact admin.')
+                logout(request)
+                return redirect('/login/')
+            
+            if profile.role == 'staff':
+                return redirect('staff_dashboard')
+            elif profile.role == 'student':
+                return redirect('student_dashboard')
+            elif profile.role == 'parent':
+                return redirect('parent_dashboard')
+            
+        else:
             messages.error(request, 'Invalid Username or Password.')
             return redirect('/login/')
-        else:
-            login(request, user)
-            return redirect('/students/') # Redirect to the main student page
 
     return render(request, "login.html")
 
 
 def logout_page(request):
     logout(request)
-    return redirect('/login/')
+    return redirect('home') # Redirect to the home page
 
-# --- Student Management Views ---
+
+def home_page(request):
+    """
+    Renders the public landing page. Redirects authenticated users based on role 
+    or renders the dashboard if not logged in.
+    """
+    if request.user.is_authenticated:
+        # Check profile for role-based redirection 
+        # (This is a cleaner way to ensure they land on their correct dashboard 
+        # if they type the root URL after logging in)
+        profile = request.user.profile
+        if profile.role == 'staff':
+            return redirect('staff_dashboard')
+        elif profile.role == 'student':
+            return redirect('student_dashboard')
+        elif profile.role == 'parent':
+            return redirect('parent_dashboard')
+        
+        # Fallback for users with profiles but no recognized role (shouldn't happen)
+        return redirect('student_report') 
+        
+    # If not authenticated, show the public landing page (home.html)
+    return render(request, 'home.html')
+
+
+# -------------------------------------------------------------------
+# --- ROLE-BASED DASHBOARDS ---
+# -------------------------------------------------------------------
+
+@login_required
+def student_dashboard(request):
+    """Shows a comprehensive personal dashboard for the logged-in student."""
+    if request.user.profile.role != 'student' or not request.user.profile.student:
+        messages.error(request, "Access denied or Student profile not linked.")
+        logout(request)
+        return redirect('home')
+
+    student = request.user.profile.student
+    
+    # --- ACADEMIC DATA ---
+    marks_queryset = SubjectMarks.objects.filter(student=student)
+    total_marks_possible = Subject.objects.count() * 100
+    
+    total_marks = marks_queryset.aggregate(total=Sum('marks'))['total'] or 0
+    percentage = round((total_marks / total_marks_possible * 100), 2) if total_marks_possible > 0 else 0
+    
+    # --- ATTENDANCE DATA ---
+    attendance_data = Attendance.objects.filter(student=student)
+    total_days = attendance_data.count()
+    present_days = attendance_data.filter(is_present=True).count()
+    attendance_percentage = round((present_days / total_days * 100), 2) if total_days > 0 else 0
+
+    # --- FEE DATA ---
+    fee_records = FeeRecord.objects.filter(student=student).order_by('-due_date')
+    pending_fees = fee_records.filter(status='pending').aggregate(total=Sum('amount_due'))['total'] or 0
+
+    context = {
+        'student': student,
+        'percentage': percentage,
+        'attendance_percentage': attendance_percentage,
+        'total_subjects': Subject.objects.count(),
+        'total_marks': total_marks,
+        'fee_records': fee_records[:5], # Show only 5 recent records
+        'pending_fees': pending_fees,
+    }
+    return render(request, 'dashboards/student_dashboard.html', context)
+
+
+@login_required
+def parent_dashboard(request):
+    """Shows a summary dashboard for the parent's linked student."""
+    if request.user.profile.role != 'parent' or not request.user.profile.related_student:
+        messages.error(request, "Access denied or Parent profile not linked to a student.")
+        logout(request)
+        return redirect('home')
+        
+    student = request.user.profile.related_student # The student associated with the parent
+    
+    # --- ACADEMIC DATA (Child) ---
+    marks_queryset = SubjectMarks.objects.filter(student=student)
+    total_marks_possible = Subject.objects.count() * 100
+    total_marks = marks_queryset.aggregate(total=Sum('marks'))['total'] or 0
+    percentage = round((total_marks / total_marks_possible * 100), 2) if total_marks_possible > 0 else 0
+
+    # --- ATTENDANCE DATA (Child) ---
+    attendance_data = Attendance.objects.filter(student=student)
+    total_days = attendance_data.count()
+    present_days = attendance_data.filter(is_present=True).count()
+    attendance_percentage = round((present_days / total_days * 100), 2) if total_days > 0 else 0
+
+    # --- FEE DATA (Child) ---
+    fee_records = FeeRecord.objects.filter(student=student).order_by('-due_date')
+    pending_fees = fee_records.filter(status='pending').aggregate(total=Sum('amount_due'))['total'] or 0
+    
+    context = {
+        'student': student,
+        'percentage': percentage,
+        'attendance_percentage': attendance_percentage,
+        'pending_fees': pending_fees,
+        'fee_records': fee_records[:3],
+    }
+    return render(request, 'dashboards/parent_dashboard.html', context)
+
+
+@login_required
+def staff_dashboard(request):
+    """A simple entry point for staff to access admin tools and reports."""
+    if request.user.profile.role != 'staff':
+        messages.error(request, "Access denied. Only Staff can view this dashboard.")
+        logout(request)
+        return redirect('home')
+
+    # Quick overview stats for the staff dashboard
+    total_students = Student.objects.count()
+    total_departments = Department.objects.count()
+    # Use Count from SubjectMarks to avoid error if no marks exist
+    avg_performance = SubjectMarks.objects.aggregate(avg=Avg('marks'))['avg']
+    pending_fee_count = FeeRecord.objects.filter(status='pending').count()
+    
+    context = {
+        'total_students': total_students,
+        'total_departments': total_departments,
+        'avg_performance': round(avg_performance, 2) if avg_performance else 0,
+        'pending_fee_count': pending_fee_count,
+    }
+    return render(request, 'dashboards/staff_dashboard.html', context)
+
+
+# -------------------------------------------------------------------
+# --- CORE STUDENT REPORTS (Mainly Staff/Admin) ---
+# -------------------------------------------------------------------
 
 @login_required
 def student_report(request):
+    # 🚨 SECURITY NOTE: Ideally, limit this view to Staff/Admin role only
+    if request.user.profile.role not in ['staff', 'admin']:
+        messages.error(request, "You do not have permission to view the full student list.")
+        return redirect('home')
+
     student_list = Student.objects.all().select_related('department', 'student_id')
     
-    # Unique Feature 1: Search Functionality
+    # ... (Search and Pagination logic remains the same) ...
     search_query = request.GET.get('search')
     if search_query:
-        # Search by student name or student ID
         student_list = student_list.filter(student_name__icontains=search_query) | \
-                       student_list.filter(student_id__student_id__icontains=search_query)
+                        student_list.filter(student_id__student_id__icontains=search_query)
 
-    # Pagination
     paginator = Paginator(student_list, 10) 
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
@@ -87,79 +246,10 @@ def student_report(request):
 
 
 @login_required
-def see_marks(request, student_id):
-    # Retrieve marks and student object
-    queryset = SubjectMarks.objects.filter(student__student_id__student_id=student_id).select_related('subject')
-    student = get_object_or_404(Student, student_id__student_id=student_id)
-    
-    # Calculate Total Marks
-    total_marks = queryset.aggregate(total=Sum('marks'))['total'] or 0
-
-    # Calculate Rank (Unique Feature 2)
-    all_totals = (
-        SubjectMarks.objects.values('student__student_id__student_id', 'student__student_name')
-        .annotate(total=Sum('marks'))
-        .order_by('-total')
-    )
-
-    rank = None
-    for idx, s in enumerate(all_totals, start=1):
-        if s['student__student_id__student_id'] == student_id:
-            rank = idx
-            break
-
-    return render(request, "see_marks.html", {
-        "queryset": queryset,
-        "total_marks": total_marks,
-        "rank": rank,
-        "student": student,
-    })
-
-# students/views.py (Add this new view)
-
-@login_required
 def student_profile(request, student_id):
     """
-    Shows a comprehensive profile page for a single student.
+    Shows a comprehensive profile page for a single student (viewable by Staff/Parent).
     """
-    # Use the Student ID string to fetch the Student object
-    student = get_object_or_404(Student, student_id__student_id=student_id)
-    
-    # Existing marks data
-    marks_queryset = SubjectMarks.objects.filter(student=student).select_related('subject')
-
-    # Calculate Total Marks (for display)
-    total_marks = marks_queryset.aggregate(total=Sum('marks'))['total'] or 0
-
-    # TODO: Fetch Attendance data here once the model is created
-
-    context = {
-        'student': student,
-        'marks_queryset': marks_queryset,
-        'total_marks': total_marks,
-        # 'attendance_data': attendance_data, # Add later
-    }
-    return render(request, 'student_profile.html', context)
-
-
-def home_page(request):
-    """
-    Renders the public landing page.
-    FORCES LOGOUT of authenticated users to ensure the dashboard is seen first.
-    """
-    if request.user.is_authenticated:
-        # Step 1: Explicitly log out the user
-        logout(request) 
-        
-        # Step 2: Set a message so the user knows what happened (optional)
-        messages.info(request, "Your previous session was automatically ended. Please log in.") 
-        
-    # Always render the public landing page (home.html)
-    return render(request, 'home.html')
-# students/views.py (Update student_profile view)
-
-@login_required
-def student_profile(request, student_id):
     student = get_object_or_404(Student, student_id__student_id=student_id)
     marks_queryset = SubjectMarks.objects.filter(student=student).select_related('subject')
     total_marks = marks_queryset.aggregate(total=Sum('marks'))['total'] or 0
@@ -176,20 +266,16 @@ def student_profile(request, student_id):
         'student': student,
         'marks_queryset': marks_queryset,
         'total_marks': total_marks,
-        'attendance_data': attendance_data, # 👈 ADDED
-        'attendance_percentage': round(attendance_percentage, 2), # 👈 ADDED
+        'attendance_data': attendance_data,
+        'attendance_percentage': round(attendance_percentage, 2),
     }
+    # Uses the student_profile.html template
     return render(request, 'student_profile.html', context)
 
 
-# students/views.py (Add new leaderboard view)
-
 @login_required
 def student_leaderboard(request):
-    """
-    Calculates overall performance and ranks all students.
-    """
-    # 1. Calculate totals for all students
+    """Calculates overall performance and ranks all students."""
     all_students_totals = (
         SubjectMarks.objects.values(
             'student__student_id__student_id',
@@ -198,20 +284,18 @@ def student_leaderboard(request):
         )
         .annotate(
             total_marks=Sum('marks'),
-            subject_count=models.Count('subject') # Need Count to calculate percentage
+            subject_count=Count('subject')
         )
         .order_by('-total_marks')
     )
 
-    # 2. Calculate percentage and assign rank
     leaderboard = []
-    max_total_marks = Subject.objects.count() * 100 # Assuming max 100 marks per subject
+    max_total_marks = Subject.objects.count() * 100 
     
     for idx, data in enumerate(all_students_totals, 1):
         total = data['total_marks']
-        count = data['subject_count']
+        # count = data['subject_count'] # Not used directly in loop, but useful for verification
         
-        # Calculate overall percentage
         percentage = (total / max_total_marks * 100) if max_total_marks > 0 else 0
         
         leaderboard.append({
@@ -227,15 +311,12 @@ def student_leaderboard(request):
 
 @login_required
 def subject_analytics(request):
-    """
-    Provides statistics (avg, highest, lowest, fail rate) per subject.
-    """
+    """Provides statistics (avg, highest, lowest, fail rate) per subject."""
     all_subjects = Subject.objects.all()
     
     analytics = []
     
     for subject in all_subjects:
-        # Aggregate performance data for the current subject
         stats = SubjectMarks.objects.filter(subject=subject).aggregate(
             avg_marks=Avg('marks'),
             max_marks=Max('marks'),
@@ -243,7 +324,6 @@ def subject_analytics(request):
             total_count=Count('marks')
         )
         
-        # Calculate Fail Count (marks < 35)
         fail_count = SubjectMarks.objects.filter(subject=subject, marks__lt=35).count()
         
         analytics.append({
@@ -258,17 +338,44 @@ def subject_analytics(request):
 
     return render(request, 'subject_analytics.html', {'analytics': analytics})
 
-# --- Seeding Utilities (Keep separate for clean views) ---
-from faker import Faker
-import random
 
-fake = Faker()
+# -------------------------------------------------------------------
+# --- API FOR CHARTS ---
+# -------------------------------------------------------------------
+
+@login_required
+def get_student_attendance_chart_data(request):
+    """Generates JSON data for the currently logged-in student's attendance pie chart."""
+    # Ensure the user is a student and linked
+    if not request.user.profile.student or request.user.profile.role != 'student':
+        return JsonResponse({'error': 'Unauthorized or Student not linked'}, status=403)
+        
+    student = request.user.profile.student
+    
+    attendance_stats = student.attendances.aggregate(
+        present_count=Count('pk', filter=Q(is_present=True)),
+        absent_count=Count('pk', filter=Q(is_present=False)),
+    )
+    
+    data = {
+        'labels': ['Present', 'Absent'],
+        'counts': [attendance_stats['present_count'], attendance_stats['absent_count']],
+    }
+    return JsonResponse(data)
+
+
+# -------------------------------------------------------------------
+# --- SEEDING UTILITIES (Keep at the bottom) ---
+# -------------------------------------------------------------------
 
 def seed_subjects():
-    subjects = ["Data Sturctures and Algorithm", "Database Management System", "Object Oriented Programming", "Operating Systems", "Computer Networks", "Software Engineering"]
+    subjects = ["Data Structures and Algorithm", "Database Management System", "Object Oriented Programming", "Operating Systems", "Computer Networks", "Software Engineering"]
     for sub in subjects:
         Subject.objects.get_or_create(subject_name=sub)
-    print("✅ Technical Subjects created successfully.")    
+    print("✅ Technical Subjects created successfully.") 
+    
+# ... (seed_db and create_subject_marks remain the same) ...
+
 
 def seed_db(n=10) -> None:
     departments_objs = Department.objects.all()
@@ -298,6 +405,7 @@ def seed_db(n=10) -> None:
         except Exception as e:
             print(f" Error creating student {i+1}: {e}")
 
+
 def create_subject_marks(n=None):
     try:
         student_objs = Student.objects.all()
@@ -308,7 +416,6 @@ def create_subject_marks(n=None):
 
         for student in student_objs:
             for subject in subjects:
-                # Ensures marks are not duplicated for a student-subject pair
                 SubjectMarks.objects.get_or_create(
                     subject=subject,
                     student=student,

@@ -1,7 +1,29 @@
 # students/models.py
 
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User 
+import datetime
+USER_ROLES = (
+    ('staff', 'Staff/Admin'),
+    ('student', 'Student'),
+    ('parent', 'Parent'),
+)
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    role = models.CharField(max_length=10, choices=USER_ROLES, default='student')
+    
+    # Link to the Student model if the role is 'student'
+    student = models.OneToOneField('Student', on_delete=models.SET_NULL, 
+                                   null=True, blank=True, related_name='user_profile')
+
+    # Link to a Student model if the role is 'parent'
+    # (A parent typically has one primary student account in a school system)
+    related_student = models.ForeignKey('Student', on_delete=models.SET_NULL, 
+                                        null=True, blank=True, related_name='parent_profiles')
+
+    def __str__(self):
+        return f'{self.user.username} ({self.get_role_display()})'
 
 class Department(models.Model):
     department = models.CharField(max_length=100)
@@ -66,3 +88,22 @@ class Attendance(models.Model):
     class Meta:
         unique_together = ['student', 'date']
         ordering = ['-date']
+
+
+
+FEE_STATUS = (
+    ('paid', 'Paid'),
+    ('pending', 'Pending'),
+    ('late', 'Late'),
+)
+
+class FeeRecord(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='fees')
+    due_date = models.DateField(default=datetime.date.today)
+    amount_due = models.DecimalField(max_digits=10, decimal_places=2)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    status = models.CharField(max_length=10, choices=FEE_STATUS, default='pending')
+    payment_date = models.DateField(null=True, blank=True)
+    
+    def __str__(self):
+        return f'{self.student.student_name} - {self.amount_due} ({self.status})'        
